@@ -1,35 +1,33 @@
-# Install and load required packages
+# Loading required packages and installing missing ones
 packages <- c("FactoMineR", "factoextra", "ggplot2", "corrplot", "psych", "RColorBrewer", "plotly", "htmlwidgets", "reshape2")
 new_packages <- packages[!(packages %in% installed.packages()[, "Package"])]
 if(length(new_packages)) install.packages(new_packages, dependencies = TRUE)
 lapply(packages, library, character.only = TRUE)
 
-# Load data
-data_path <- "C:/Users/theoa/OneDrive/Desktop/Bath/DATA-Case-Study-2/CancerCells_ShapeAndDNA.csv" # Update with your actual path
+# Importing and preprocessing the dataset
+data_path <- "path/to/your/data.csv"  # Specify the path to your dataset
 rawdata <- read.csv(data_path, stringsAsFactors = FALSE)
 rawdata <- na.omit(rawdata)
 
-# Scaling Numeric Data
+# Scaling the numeric data in the dataset
 numeric_columns <- sapply(rawdata, is.numeric)
 data_scaled <- scale(rawdata[, numeric_columns], center = TRUE, scale = TRUE)
 data_scaled <- as.data.frame(data_scaled)
 colnames(data_scaled) <- colnames(rawdata)[numeric_columns]
 
-# PCA Analysis
+# Performing PCA analysis
 res.pca <- PCA(data_scaled, graph = FALSE)
 res.pca6 <- PCA(data_scaled, graph = FALSE, ncp = 6)
 
-
-# Create Color Palette for Cell.lines
+# Creating a color palette for the 'Cell.line' attribute
 unique_cell_lines <- unique(rawdata$'Cell.line')
 num_colors_needed <- max(3, length(unique_cell_lines))
 colors <- brewer.pal(num_colors_needed, "Set1")
 color_map <- setNames(colors, unique_cell_lines)
 rawdata$'Cell.line' <- as.factor(rawdata$'Cell.line')
 
-
-# Scree Plot with Enhanced Styling
-fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 100)) +
+# Generating a scree plot with enhanced styling
+scree_plot <- fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 100)) +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
@@ -42,44 +40,35 @@ fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 100)) +
   ggtitle("Variance Explained by Each Principal Component") +
   xlab("Principal Components") +
   ylab("Percentage of Variance Explained") +
-  scale_color_brewer(palette = "Dark2") + # Color scheme
-  geom_line(size = 1) + # Thicker line
-  geom_point(size = 3) # Larger points
+  scale_color_brewer(palette = "Dark2") +
+  geom_line(size = 1) +
+  geom_point(size = 3)
+ggsave("variance_by_pc_enhanced.png", scree_plot, width = 10, height = 6)
 
-# Save the plot
-ggsave("variance_by_pc_enhanced.png", width = 10, height = 6)
-
-# Function to create and save a bar plot of variable contributions for a given principal component
+# Function to create and save bar plots of variable contributions for principal components
 save_var_contribution_barplot <- function(pca_result, comp_num) {
   var_contributions <- get_pca_var(pca_result)
   contrib_df <- data.frame(Variable = rownames(var_contributions$contrib),
                            Contribution = var_contributions$contrib[, comp_num])
-  
-  # Sort the data frame by contribution.
   contrib_df <- contrib_df[order(-contrib_df$Contribution), ]
-  
-  # Create the bar plot
-  ggplot(contrib_df, aes(x = reorder(Variable, -Contribution), y = Contribution)) +
+  bar_plot <- ggplot(contrib_df, aes(x = reorder(Variable, -Contribution), y = Contribution)) +
     geom_bar(stat = "identity", fill = "steelblue") +
     geom_hline(yintercept = mean(contrib_df$Contribution), linetype = "dashed", color = "red") +
-    labs(title = paste("Contribution of Variables to Dim-", comp_num), x = "", y = "Contributions (%)") +
+    labs(title = paste("Contribution of Variables to PC", comp_num), x = "", y = "Contribution (%)") +
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1))
-  
-  # Save the plot
-  ggsave(paste("var_contribution_dim_", comp_num, ".png", sep = ""), width = 12, height = 6)
+  ggsave(paste("var_contribution_pc_", comp_num, ".png", sep = ""), bar_plot, width = 12, height = 6)
 }
 
-# Generate and save the plots for the variable contributions of the first 6 principal components
+# Generating bar plots for the first 6 principal components
 for (i in 1:6) {
   save_var_contribution_barplot(res.pca6, i)
 }
 
-# Function to get top 4 contributions for each of the first 5 PCs
+# Function to identify top contributions for principal components
 get_top_contributions <- function(pca_result, num_pcs = 5, top_n = 4) {
   var_contributions <- get_pca_var(pca_result)
   all_top_contribs <- list()
-  
   for (i in 1:num_pcs) {
     contrib_df <- data.frame(PC = i,
                              Variable = rownames(var_contributions$contrib),
@@ -87,41 +76,35 @@ get_top_contributions <- function(pca_result, num_pcs = 5, top_n = 4) {
     top_contribs <- head(contrib_df[order(-contrib_df$Contribution), ], top_n)
     all_top_contribs[[i]] <- top_contribs
   }
-  
   do.call(rbind, all_top_contribs)
 }
 
-# Get the top contributions
+# Retrieving the top contributions for the first 5 principal components
 top_contributions <- get_top_contributions(res.pca, 5, 4)
 
-# Plotting
-ggplot(top_contributions, aes(x = Variable, y = Contribution, fill = factor(PC))) +
+# Plotting the top contributions for the first 5 principal components
+top_contributions_plot <- ggplot(top_contributions, aes(x = Variable, y = Contribution, fill = factor(PC))) +
   geom_bar(stat = "identity", position = position_dodge()) +
-  labs(title = "Top 4 Contributions for the First 5 PCs", 
+  labs(title = "Top Contributions for the First 5 Principal Components", 
        x = "Variable", 
        y = "Contribution (%)", 
        fill = "Principal Component") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave("top_contributions_first_5_pcs.png", top_contributions_plot, width = 10, height = 6)
 
-# Prepare scores for the plotly scatter plot
+# Preparing data for a 3D scatter plot
 scores_df <- as.data.frame(res.pca$ind$coord[, 1:3])
 names(scores_df) <- c("PC1", "PC2", "PC3")
-
-# Assign colors based on the cell line
-cell_line_colors <- as.factor(rawdata$Cell.line) # Assuming 'Cell.line' column exists
-
-# Generate a color palette
+cell_line_colors <- as.factor(rawdata$Cell.line)
 colors <- colorRampPalette(RColorBrewer::brewer.pal(min(length(unique(cell_line_colors)), 9), "Set1"))(length(unique(cell_line_colors)))
 color_map <- setNames(colors, levels(cell_line_colors))
 
-# Create a 3D scatter plot for the individuals
-plot <- plot_ly()
-
-# Plot each cell line with a separate trace to get a legend for each
+# Creating a 3D scatter plot
+plot_3d <- plot_ly()
 for (cell_line in levels(cell_line_colors)) {
   cell_line_data <- scores_df[cell_line_colors == cell_line, ]
-  plot <- plot %>%
+  plot_3d <- plot_3d %>%
     add_trace(data = cell_line_data, x = ~PC1, y = ~PC2, z = ~PC3, type = 'scatter3d', mode = 'markers',
               marker = list(size = 6, color = color_map[cell_line], opacity = 0.7),
               name = cell_line,
@@ -129,25 +112,28 @@ for (cell_line in levels(cell_line_colors)) {
               showlegend = TRUE)
 }
 
-# Add arrows for loadings, scaled to be longer
+# Adding loadings as arrows to the 3D scatter plot
 loadings <- res.pca$var$coord[, 1:3]
-loading_scale <- 2 # Adjust this scale factor as needed to make arrows longer
+loading_scale <- 10
+text_size <- 12
 for (i in 1:nrow(loadings)) {
-  plot <- plot %>%
-    add_trace(x = c(0, loadings[i, 1] * loading_scale), 
-              y = c(0, loadings[i, 2] * loading_scale), 
-              z = c(0, loadings[i, 3] * loading_scale),
+  end_x <- loadings[i, 1] * loading_scale
+  end_y <- loadings[i, 2] * loading_scale
+  end_z <- loadings[i, 3] * loading_scale
+  plot_3d <- plot_3d %>%
+    add_trace(x = c(0, end_x), y = c(0, end_y), z = c(0, end_z),
               type = "scatter3d", mode = "lines+text",
               line = list(color = "black", width = 3),
               text = rownames(loadings)[i],
               textposition = "top center",
+              textfont = list(size = text_size, color = "black"),
               legendgroup = "loadings",
-              showlegend = i == 1, # Only show legend for the first arrow
+              showlegend = i == 1,
               name = "Loadings")
 }
 
-# Define the layout of the plot
-plot <- plot %>%
+# Defining layout of the 3D plot
+plot_3d <- plot_3d %>%
   layout(title = "3D PCA Scatter Plot with Variable Loadings",
          legend = list(x = 0.1, y = 0.9),
          scene = list(xaxis = list(title = 'PC1'),
@@ -156,24 +142,14 @@ plot <- plot %>%
                       camera = list(up = list(x = 0, y = 0, z = 1),
                                     center = list(x = 0, y = 0, z = 0),
                                     eye = list(x = 1.25, y = 1.25, z = 1.25))))
+plot_3d
 
-# Render the 3D plot
-plot
-
-
-# Determine the number of available PCs
+# Creating bar plots for variable contributions for each principal component
 num_pcs <- ncol(res.pca$var$contrib)
-
-# Creating bar plots for variable contributions for available PCs
 for (pc in 1:min(num_pcs, 6)) {
-  # Extract the contributions for the current principal component
   contributions <- res.pca$var$contrib[, pc, drop = FALSE]
   var_names <- rownames(res.pca$var$contrib)
-  
-  # Create a data frame with correct structure
   var_contrib <- data.frame(Variable = var_names, Contribution = contributions[,1])
-  
-  # Create and print the bar plot
   bar_plot <- ggplot(var_contrib, aes(x = reorder(Variable, Contribution), y = Contribution)) +
     geom_bar(stat = "identity", fill = "steelblue") +
     coord_flip() +
@@ -181,16 +157,15 @@ for (pc in 1:min(num_pcs, 6)) {
          x = "Variable",
          y = "Contribution (%)") +
     theme_minimal()
-  
   ggsave(paste("var_contribution_PC", pc, ".png", sep = ""), bar_plot, width = 10, height = 6)
   print(bar_plot)
 }
 
-# Prepare scores for the 2D plot of PC4 vs PC5
+# Preparing data for a 2D scatter plot of PC4 vs PC5
 scores_df_2d <- as.data.frame(res.pca$ind$coord[, 4:5])
 names(scores_df_2d) <- c("PC4", "PC5")
 
-# Create a 2D scatter plot for PC4 vs PC5
+# Creating a 2D scatter plot for PC4 vs PC5
 biplot <- fviz_pca_biplot(res.pca, 
                           label = "var", 
                           habillage = as.factor(rawdata$Cell.line), 
@@ -206,50 +181,48 @@ biplot <- fviz_pca_biplot(res.pca,
        x = "PC4", 
        y = "PC5")
 
-# Print the biplot
+# Saving and printing the biplot
 ggsave("biplot_PC4_PC5.png", biplot, width = 10, height = 6)
 print(biplot)
 
-# Prepare scores with cell line labels for variance calculation
+# Preparing scores with cell line labels for variance calculation
 scores_df <- as.data.frame(res.pca$ind$coord[, 1:5]) # Adjust to include the first five PCs
 names(scores_df) <- c("PC1", "PC2", "PC3", "PC4", "PC5") # Update names accordingly
 scores_df$Cell.line <- rawdata$Cell.line
 
-# Calculate Weighted Within-Group Variance using MAD
+# Calculating and normalizing variances
 within_group_mad <- aggregate(cbind(PC1, PC2, PC3, PC4, PC5) ~ Cell.line, data = scores_df, function(x) mad(x, constant = 1))
 within_group_variance <- within_group_mad[, -1]
 total_within_variance <- rowSums(within_group_variance)
 
-# Calculate Between-Group Variance using MAD on group means
 group_means <- aggregate(cbind(PC1, PC2, PC3, PC4, PC5) ~ Cell.line, data = scores_df, mean)
 between_group_variance <- sapply(group_means[, -1], mad, constant = 1) ^ 2
 total_between_variance <- sum(between_group_variance)
 
-# Normalize both variances
 normalized_within_variance <- within_group_variance / total_within_variance
 normalized_between_variance <- between_group_variance / total_between_variance
 
-# Reshape for plotting
+# Reshaping data for plotting
 normalized_within_long <- melt(normalized_within_variance)
 normalized_within_long$Type <- "Within-Group"
-names(normalized_within_long) <- c("Component", "Variance", "Type") # Ensure consistent column names
+names(normalized_within_long) <- c("Component", "Variance", "Type")
 
 normalized_between_long <- data.frame(Component = names(normalized_between_variance), Variance = unlist(normalized_between_variance))
 normalized_between_long$Type <- "Between-Group"
 
-# Combine the data frames
+# Combining data frames
 combined_variance_data <- rbind(normalized_within_long, normalized_between_long)
 
-# Plotting the variances
+# Plotting normalized variances
 variance_plot <- ggplot(combined_variance_data, aes(x = Component, y = Variance, fill = Type)) +
-  geom_bar(stat = "identity", position = position_dodge()) +
-  facet_wrap(~ Component, scales = "free") +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +
   theme_minimal() +
   labs(title = "Normalized Within-Group and Between-Group Variance",
        x = "Principal Component",
        y = "Normalized Variance") +
+  scale_fill_manual(values = c("Within-Group" = "blue", "Between-Group" = "red")) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-# Render the plot
-ggsave("normalized_variance_plot.png", variance_plot, width = 10, height = 6)
+# Saving and rendering the plot
+ggsave("combined_normalized_variance_plot.png", variance_plot, width = 10, height = 6)
 print(variance_plot)
