@@ -5,7 +5,7 @@ if(length(new_packages)) install.packages(new_packages, dependencies = TRUE)
 lapply(packages, library, character.only = TRUE)
 
 # Importing and preprocessing the dataset
-data_path <- "path/to/your/data.csv"  # Specify the path to your dataset
+data_path <- "C:/Users/theoa/OneDrive/Desktop/Bath/DATA-Case-Study-2/CancerCells_ShapeAndDNA.csv" # Update with your actual path
 rawdata <- read.csv(data_path, stringsAsFactors = FALSE)
 rawdata <- na.omit(rawdata)
 
@@ -18,7 +18,7 @@ colnames(data_scaled) <- colnames(rawdata)[numeric_columns]
 # Performing PCA analysis
 res.pca <- PCA(data_scaled, graph = FALSE)
 res.pca6 <- PCA(data_scaled, graph = FALSE, ncp = 6)
-
+res.pca12 <- PCA(data_scaled, graph = FALSE, ncp = 12)
 # Creating a color palette for the 'Cell.line' attribute
 unique_cell_lines <- unique(rawdata$'Cell.line')
 num_colors_needed <- max(3, length(unique_cell_lines))
@@ -169,7 +169,7 @@ names(scores_df_2d) <- c("PC4", "PC5")
 biplot <- fviz_pca_biplot(res.pca, 
                           label = "var", 
                           habillage = as.factor(rawdata$Cell.line), 
-                          axes = c(4, 5), # Specify the PCs to plot
+                          axes = c(1, 2), # Specify the PCs to plot
                           addEllipses = TRUE, 
                           ellipse.Level = 0.95,
                           col.var = "black", 
@@ -186,16 +186,16 @@ ggsave("biplot_PC4_PC5.png", biplot, width = 10, height = 6)
 print(biplot)
 
 # Preparing scores with cell line labels for variance calculation
-scores_df <- as.data.frame(res.pca$ind$coord[, 1:5]) # Adjust to include the first five PCs
-names(scores_df) <- c("PC1", "PC2", "PC3", "PC4", "PC5") # Update names accordingly
+scores_df <- as.data.frame(res.pca12$ind$coord[, 1:10]) # Adjust to include the first five PCs
+names(scores_df) <- c("PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9", "PC10") # Update names accordingly
 scores_df$Cell.line <- rawdata$Cell.line
 
 # Calculating and normalizing variances
-within_group_mad <- aggregate(cbind(PC1, PC2, PC3, PC4, PC5) ~ Cell.line, data = scores_df, function(x) mad(x, constant = 1))
+within_group_mad <- aggregate(cbind(PC1, PC2, PC3, PC4, PC5, PC6, PC7, PC8, PC9, PC10) ~ Cell.line, data = scores_df, function(x) mad(x, constant = 1))
 within_group_variance <- within_group_mad[, -1]
 total_within_variance <- rowSums(within_group_variance)
 
-group_means <- aggregate(cbind(PC1, PC2, PC3, PC4, PC5) ~ Cell.line, data = scores_df, mean)
+group_means <- aggregate(cbind(PC1, PC2, PC3, PC4, PC5, PC6, PC7, PC8, PC9, PC10) ~ Cell.line, data = scores_df, mean)
 between_group_variance <- sapply(group_means[, -1], mad, constant = 1) ^ 2
 total_between_variance <- sum(between_group_variance)
 
